@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#4a90d9">
+  <title>英単語フラッシュカード</title>
+  <!-- PWA マニフェスト -->
+  <link rel="manifest" href="manifest.json">
+  <!-- アプリアイコン（iOS用） -->
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ==============================
+       (A) ホーム画面
+       ============================== -->
+  <div id="screen-home" class="screen active">
+    <header class="app-header">
+      <h1>英単語フラッシュカード</h1>
+      <button class="icon-btn" id="btn-settings" aria-label="設定">⚙️</button>
+    </header>
+
+    <!-- 読み込み中メッセージ -->
+    <div id="loading-message" class="loading-box">
+      <p>単語データを読み込んでいます...</p>
+    </div>
+
+    <!-- 読み込み完了後に表示 -->
+    <div id="home-content" class="hidden">
+      <!-- 今日の状況 -->
+      <section class="stat-section">
+        <h2>今日の学習</h2>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-num" id="stat-due">0</span>
+            <span class="stat-label">復習あり</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num" id="stat-new">0</span>
+            <span class="stat-label">新規導入可</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 全体進捗 -->
+      <section class="stat-section">
+        <h2>全体の進捗</h2>
+        <div class="progress-bar-container">
+          <div class="progress-bar">
+            <div class="bar-mastered" id="bar-mastered"></div>
+            <div class="bar-learning" id="bar-learning"></div>
+            <div class="bar-new" id="bar-new"></div>
+          </div>
+        </div>
+        <div class="progress-legend">
+          <span class="legend-mastered">■ マスター: <b id="count-mastered">0</b></span>
+          <span class="legend-learning">■ 学習中: <b id="count-learning">0</b></span>
+          <span class="legend-new">■ 未学習: <b id="count-new">0</b></span>
+        </div>
+        <p class="total-note">合計: <b id="count-total">0</b> 語</p>
+      </section>
+
+      <!-- 学習開始ボタン -->
+      <button class="btn-primary" id="btn-start">学習を始める（20語）</button>
+      <p id="no-cards-message" class="no-cards hidden">今日の学習は完了です！また明日 😊</p>
+    </div>
+  </div>
+
+  <!-- ==============================
+       (B) 学習画面（カード）
+       ============================== -->
+  <div id="screen-study" class="screen hidden">
+    <header class="study-header">
+      <button class="icon-btn" id="btn-quit" aria-label="終了">✕</button>
+      <div class="progress-indicator">
+        <span id="progress-text">0 / 20</span>
+        <div class="progress-mini-bar">
+          <div class="progress-mini-fill" id="progress-fill"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- カード本体 -->
+    <div class="card-area">
+      <div id="flashcard" class="flashcard" role="button" tabindex="0" aria-label="カードをタップして裏返す">
+        <div class="card-front">
+          <!-- 辞書種別バッジ -->
+          <span class="dict-badge" id="dict-badge">英和</span>
+          <!-- 表面（見出し語） -->
+          <p class="word-text" id="word-front"></p>
+          <p class="hint-text">タップして答えを見る</p>
+        </div>
+        <div class="card-back hidden">
+          <!-- 裏面（意味） -->
+          <p class="word-text" id="word-front-back"></p>
+          <hr class="card-divider">
+          <p class="meaning-text" id="word-meaning"></p>
+          <p class="card-meta" id="word-meta"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 採点ボタン（裏面表示後に出現） -->
+    <div class="grade-buttons hidden" id="grade-buttons">
+      <button class="btn-wrong" id="btn-wrong">✗ わからなかった</button>
+      <button class="btn-correct" id="btn-correct">◯ わかった</button>
+    </div>
+  </div>
+
+  <!-- ==============================
+       (C) セッション結果画面
+       ============================== -->
+  <div id="screen-result" class="screen hidden">
+    <header class="app-header">
+      <h1>セッション結果</h1>
+    </header>
+    <div class="result-content">
+      <div class="result-score">
+        <span id="result-correct">0</span>
+        <span class="result-slash">/</span>
+        <span id="result-total">0</span>
+        <p class="result-label">正解</p>
+      </div>
+      <div class="result-details">
+        <p>新規学習: <b id="result-new">0</b> 語</p>
+        <p>復習: <b id="result-review">0</b> 語</p>
+      </div>
+      <div class="result-schedule" id="result-schedule">
+        <!-- 次回の復習スケジュールをここに表示 -->
+      </div>
+      <div class="result-buttons">
+        <button class="btn-secondary" id="btn-home">ホームに戻る</button>
+        <button class="btn-primary" id="btn-more">もう20語</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================
+       (D) 設定画面
+       ============================== -->
+  <div id="screen-settings" class="screen hidden">
+    <header class="app-header">
+      <button class="icon-btn" id="btn-settings-back" aria-label="戻る">←</button>
+      <h1>設定</h1>
+    </header>
+    <div class="settings-content">
+      <section class="settings-section">
+        <h2>学習設定</h2>
+        <label class="settings-row">
+          <span>1セッションの枚数</span>
+          <input type="number" id="setting-session-size" min="5" max="50" value="20">
+        </label>
+        <label class="settings-row">
+          <span>1日の新規導入上限</span>
+          <input type="number" id="setting-new-per-day" min="1" max="50" value="10">
+        </label>
+        <label class="settings-row">
+          <span>出題対象</span>
+          <select id="setting-direction">
+            <option value="英和">英和のみ（英→日）</option>
+            <option value="和英">和英のみ（日→英）</option>
+            <option value="両方">両方</option>
+          </select>
+        </label>
+        <button class="btn-secondary" id="btn-save-settings">設定を保存</button>
+        <p id="settings-saved-msg" class="hidden save-msg">保存しました ✓</p>
+      </section>
+
+      <section class="settings-section">
+        <h2>データ管理</h2>
+        <button class="btn-secondary" id="btn-export">進捗をエクスポート（JSON）</button>
+        <label class="btn-secondary btn-file-label">
+          進捗をインポート（JSON）
+          <input type="file" id="input-import" accept=".json" class="hidden">
+        </label>
+        <button class="btn-danger" id="btn-reset">進捗をリセット</button>
+      </section>
+
+      <section class="settings-section">
+        <p class="settings-info" id="settings-word-count"></p>
+      </section>
+    </div>
+  </div>
+
+  <!-- PapaParse: RFC 4180 準拠の CSV パーサ（CDN） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- アプリ本体 -->
+  <script src="app.js"></script>
+</body>
+</html>
