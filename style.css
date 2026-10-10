@@ -555,3 +555,40 @@ html, body {
   .grade-buttons { gap: 8px; }
   .btn-wrong, .btn-correct { padding: 16px 8px; font-size: 0.9rem; }
 }
+
+/* --- 文型クイズからの取りこみ --- */
+#btn-import-words { margin-top: 16px; }
+
+.paste-box { margin-top: 12px; }
+.paste-note, .import-msg { font-size: 0.9rem; color: var(--text-secondary); margin: 8px 0; }
+
+.paste-box textarea,
+.meaning-edit textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 16px; /* iOS で16px未満だと入力時に画面が勝手に拡大されるため */
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.user-card-extras { margin-top: 12px; text-align: left; }
+.example-text { font-family: Georgia, serif; line-height: 1.6; margin: 0 0 6px; }
+.example-ja { font-size: 0.9rem; color: var(--text-secondary); margin: 0 0 10px; }
+
+.btn-small {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+}
+
+.meaning-edit { margin-top: 8px; }
+.meaning-edit .btn-small { margin-top: 6px; }

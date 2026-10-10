@@ -16,6 +16,13 @@ const INTERVAL_DAYS = [0, 1, 2, 4, 9, 21];
 const KEY_PROGRESS = 'wisdom_flashcards_progress_v1';
 const KEY_SETTINGS = 'wisdom_flashcards_settings_v1';
 const KEY_INTRO    = 'wisdom_flashcards_intro_v1';
+const KEY_USER_WORDS = 'wisdom_flashcards_user_words_v1';
+
+/** 文型クイズから取りこんだ単語のID開始番号。CSVの行番号と重ならないよう大きく離す */
+const USER_ID_BASE = 1000000;
+
+/** 文型クイズがコピーする文字列の先頭の目印（クイズ側と同じ値） */
+const WORDS_HEADER = 'BUNKEI-QUIZ-WORDS';
 
 /** CSVファイルのパス */
 const CSV_PATH = 'data/words.csv';
@@ -39,6 +46,9 @@ let settings = {
 
 /** localStorage から読んだ進捗データ { cardId: {box, due, correct, wrong, last} } */
 let progress = {};
+
+/** 文型クイズから取りこんだ単語 [{headword, meaning, example, translation, source, regDate}] */
+let userWords = [];
 
 /** 本日の新規導入カウント { 'YYYY-MM-DD': 数 } */
 let introCount = {};
@@ -141,6 +151,41 @@ function saveIntroCount() {
   } catch (e) {
     console.error('新規導入カウントの保存に失敗しました', e);
   }
+}
+
+function loadUserWords() {
+  try {
+    const raw = localStorage.getItem(KEY_USER_WORDS);
+    const list = raw ? JSON.parse(raw) : [];
+    userWords = Array.isArray(list) ? list : [];
+  } catch {
+    userWords = [];
+  }
+}
+
+function saveUserWords() {
+  try {
+    localStorage.setItem(KEY_USER_WORDS, JSON.stringify(userWords));
+    return true;
+  } catch (e) {
+    console.error('取りこんだ単語の保存に失敗しました', e);
+    return false;
+  }
+}
+
+/** 取りこんだ単語をカードの形にする。並び順を変えないので ID（＝進捗の紐づけ）は変わらない */
+function toUserCards() {
+  return userWords.map((u, i) => ({
+    id: USER_ID_BASE + i,
+    headword: u.headword,
+    meaning: u.meaning || '',
+    dict: '英和',
+    regDate: u.regDate,
+    example: u.example || '',
+    translation: u.translation || '',
+    source: u.source || '',
+    isUser: true,
+  }));
 }
 
 // ============================================================
@@ -272,6 +317,8 @@ function buildSessionQueue() {
         return !p || p.box === 0;  // 未学習
       })
       .sort((a, b) => {
+        // 自分で選んだ単語を先に出す。登録日順だけだと5000語以上の後ろに回ってしまうため
+        if (Boolean(a.isUser) !== Boolean(b.isUser)) return a.isUser ? -1 : 1;
         // 登録日の古い順
         if (a.regDate < b.regDate) return -1;
         if (a.regDate > b.regDate) return 1;
@@ -432,11 +479,47 @@ function showNextCard() {
   document.getElementById('word-meaning').innerHTML = escapeHtml(word.meaning);
   document.getElementById('word-meta').textContent =
     `${word.dict} / 登録日: ${word.regDate}`;
+  showUserCardExtras(word);
 
   // 表面のみ表示、裏面と採点ボタンを隠す
   document.querySelector('.card-front').classList.remove('hidden');
   document.querySelector('.card-back').classList.add('hidden');
   document.getElementById('grade-buttons').classList.add('hidden');
+}
+
+/** 取りこんだ単語だけ、例文・訳文と「意味を書き足す」欄を出す */
+function showUserCardExtras(word) {
+  const box = document.getElementById('user-card-extras');
+  box.classList.toggle('hidden', !word.isUser);
+  document.getElementById('meaning-edit').classList.add('hidden');
+  if (!word.isUser) return;
+  if (!word.meaning) {
+    document.getElementById('word-meaning').textContent = '（意味はまだありません）';
+  }
+  document.getElementById('word-example').textContent = word.example;
+  document.getElementById('word-example-ja').textContent = word.translation ? `訳: ${word.translation}` : '';
+  document.getElementById('word-meta').textContent = `文型クイズ / ${word.source} / 登録日: ${word.regDate}`;
+  document.getElementById('btn-edit-meaning').textContent = word.meaning ? '意味を直す' : '意味を書き足す';
+}
+
+function openMeaningEdit(event) {
+  event.stopPropagation();
+  const word = allWords.find(w => w.id === currentCardId);
+  document.getElementById('input-meaning').value = word.meaning;
+  document.getElementById('meaning-edit').classList.remove('hidden');
+  document.getElementById('input-meaning').focus();
+}
+
+function saveMeaning(event) {
+  event.stopPropagation();
+  const word = allWords.find(w => w.id === currentCardId);
+  const meaning = document.getElementById('input-meaning').value.trim();
+  word.meaning = meaning;
+  userWords[word.id - USER_ID_BASE].meaning = meaning;
+  saveUserWords();
+  document.getElementById('word-meaning').textContent = meaning || '（意味はまだありません）';
+  document.getElementById('meaning-edit').classList.add('hidden');
+  document.getElementById('btn-edit-meaning').textContent = meaning ? '意味を直す' : '意味を書き足す';
 }
 
 /** カードをめくる（表→裏） */
@@ -626,12 +709,79 @@ function resetProgress() {
 }
 
 // ============================================================
+// 文型クイズからの取りこみ
+// ============================================================
+
+/** コピーされた文字列から単語の配列を取り出す。形が違えば null */
+function parseQuizWords(text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed.startsWith(WORDS_HEADER)) return null;
+  try {
+    const list = JSON.parse(trimmed.slice(WORDS_HEADER.length));
+    return Array.isArray(list) ? list.filter(w => w && typeof w.word === 'string' && w.word.trim()) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** まだ英和カードにない単語だけ追加する。すでにある語（CSV・取りこみ済み）は飛ばす */
+function addQuizWords(list) {
+  const known = new Set(allWords.filter(w => w.dict === '英和').map(w => w.headword.toLowerCase()));
+  let added = 0;
+  for (const w of list) {
+    const headword = w.word.trim();
+    if (known.has(headword.toLowerCase())) continue;
+    known.add(headword.toLowerCase());
+    userWords.push({
+      headword,
+      meaning: '',
+      example: String(w.sentence || ''),
+      translation: String(w.translation || ''),
+      source: String(w.source || ''),
+      regDate: getToday(),
+    });
+    added++;
+  }
+  saveUserWords();
+  allWords = allWords.filter(w => !w.isUser).concat(toUserCards());
+  return { added, skipped: list.length - added };
+}
+
+function importQuizText(text) {
+  const msg = document.getElementById('import-words-msg');
+  const list = parseQuizWords(text);
+  if (!list) {
+    msg.textContent = '文型クイズの単語が見つかりませんでした。クイズで「単語帳へ送る」を押してから、もう一度お試しください。';
+    return false;
+  }
+  const { added, skipped } = addQuizWords(list);
+  msg.textContent = `${added}語を追加しました。` + (skipped > 0 ? `（${skipped}語はすでに登録済み）` : '');
+  document.getElementById('paste-box').classList.add('hidden');
+  updateHomeScreen();
+  return true;
+}
+
+/** クリップボードを読めない環境では、貼り付け欄を出して手で貼ってもらう */
+async function handleImportQuizWords() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (importQuizText(text)) return;
+  } catch {
+    /* 読み取りを断られた・未対応 */
+  }
+  document.getElementById('paste-box').classList.remove('hidden');
+  document.getElementById('input-paste').focus();
+}
+
+// ============================================================
 // キーボード操作（§4-B）
 // ============================================================
 
 document.addEventListener('keydown', (e) => {
   const studyScreen = document.getElementById('screen-study');
   if (!studyScreen.classList.contains('active')) return;
+  // 意味の入力中にスペースやEnterでカードが進まないようにする
+  if (e.target.tagName === 'TEXTAREA') return;
 
   switch (e.key) {
     case ' ':
@@ -658,6 +808,10 @@ function setupEventListeners() {
   // ホーム
   document.getElementById('btn-start').addEventListener('click', startSession);
   document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('btn-import-words').addEventListener('click', handleImportQuizWords);
+  document.getElementById('btn-paste-import').addEventListener('click', () => {
+    importQuizText(document.getElementById('input-paste').value);
+  });
 
   // 学習
   document.getElementById('flashcard').addEventListener('click', () => {
@@ -665,6 +819,9 @@ function setupEventListeners() {
   });
   document.getElementById('btn-correct').addEventListener('click', () => handleGrade(true));
   document.getElementById('btn-wrong').addEventListener('click', () => handleGrade(false));
+  document.getElementById('btn-edit-meaning').addEventListener('click', openMeaningEdit);
+  document.getElementById('btn-save-meaning').addEventListener('click', saveMeaning);
+  document.getElementById('meaning-edit').addEventListener('click', e => e.stopPropagation());
   document.getElementById('btn-quit').addEventListener('click', () => {
     if (confirm('学習を終了してホームに戻りますか？')) {
       showScreen('home');
@@ -707,10 +864,11 @@ async function init() {
   loadProgress();
   loadSettings();
   loadIntroCount();
+  loadUserWords();
 
   try {
     // CSV を読み込む
-    allWords = await loadCSV();
+    allWords = (await loadCSV()).concat(toUserCards());
 
     // ホーム画面のローディング表示を消して、コンテンツを表示
     document.getElementById('loading-message').classList.add('hidden');

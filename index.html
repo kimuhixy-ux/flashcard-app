@@ -65,6 +65,15 @@
       <!-- 学習開始ボタン -->
       <button class="btn-primary" id="btn-start">学習を始める（20語）</button>
       <p id="no-cards-message" class="no-cards hidden">今日の学習は完了です！また明日 😊</p>
+
+      <!-- 文型クイズで選んだ単語の取りこみ -->
+      <button class="btn-secondary" id="btn-import-words">文型クイズから取りこむ</button>
+      <div id="paste-box" class="paste-box hidden">
+        <p class="paste-note">自動で読み取れませんでした。下の欄を長押しして「ペースト」してから、「取りこむ」を押してください。</p>
+        <textarea id="input-paste" rows="3" autocapitalize="off" spellcheck="false"></textarea>
+        <button class="btn-secondary" id="btn-paste-import">取りこむ</button>
+      </div>
+      <p id="import-words-msg" class="import-msg" role="status"></p>
     </div>
   </div>
 
@@ -97,6 +106,15 @@
           <p class="word-text" id="word-front-back"></p>
           <hr class="card-divider">
           <p class="meaning-text" id="word-meaning"></p>
+          <div id="user-card-extras" class="user-card-extras hidden">
+            <p class="example-text" id="word-example" lang="en"></p>
+            <p class="example-ja" id="word-example-ja"></p>
+            <button class="btn-small" id="btn-edit-meaning" type="button">意味を書き足す</button>
+            <div id="meaning-edit" class="meaning-edit hidden">
+              <textarea id="input-meaning" rows="2"></textarea>
+              <button class="btn-small" id="btn-save-meaning" type="button">意味を保存</button>
+            </div>
+          </div>
           <p class="card-meta" id="word-meta"></p>
         </div>
       </div>
