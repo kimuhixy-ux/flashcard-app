@@ -2,7 +2,7 @@
    Service Worker - オフライン対応キャッシュ
    ============================================================ */
 
-const CACHE_NAME = 'flashcard-v3';
+const CACHE_NAME = 'flashcard-v4';
 
 // 初回インストール時にキャッシュするファイル一覧
 const FILES_TO_CACHE = [
