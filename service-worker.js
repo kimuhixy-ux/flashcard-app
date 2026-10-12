@@ -2,7 +2,7 @@
    Service Worker - オフライン対応キャッシュ
    ============================================================ */
 
-const CACHE_NAME = 'flashcard-v2';
+const CACHE_NAME = 'flashcard-v3';
 
 // 初回インストール時にキャッシュするファイル一覧
 const FILES_TO_CACHE = [
@@ -12,6 +12,7 @@ const FILES_TO_CACHE = [
   './app.js',
   './manifest.json',
   './data/words.csv',
+  './data/examples.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js',

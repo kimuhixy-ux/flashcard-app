@@ -27,6 +27,9 @@ const WORDS_HEADER = 'BUNKEI-QUIZ-WORDS';
 /** CSVファイルのパス */
 const CSV_PATH = 'data/words.csv';
 
+/** 英米文学の例文（見出し語 → {en, form, ja, work, author}） */
+const EXAMPLES_PATH = 'data/examples.json';
+
 /** セッション中の最大消化枚数（無限ループ防止） */
 const MAX_SESSION_CARDS = 80;
 
@@ -49,6 +52,9 @@ let progress = {};
 
 /** 文型クイズから取りこんだ単語 [{headword, meaning, example, translation, source, regDate}] */
 let userWords = [];
+
+/** 英米文学の例文。読めなかったときは空のまま（例文なしで学習できる） */
+let literaryExamples = {};
 
 /** 本日の新規導入カウント { 'YYYY-MM-DD': 数 } */
 let introCount = {};
@@ -232,6 +238,16 @@ function loadCSV() {
       }
     });
   });
+}
+
+/** 例文は補助なので、読み込みに失敗してもアプリは止めない */
+async function loadExamples() {
+  try {
+    const res = await fetch(EXAMPLES_PATH);
+    if (res.ok) literaryExamples = await res.json();
+  } catch (e) {
+    console.warn('例文の読み込みに失敗しました', e);
+  }
 }
 
 // ============================================================
@@ -480,11 +496,39 @@ function showNextCard() {
   document.getElementById('word-meta').textContent =
     `${word.dict} / 登録日: ${word.regDate}`;
   showUserCardExtras(word);
+  showLiteraryExample(word);
 
   // 表面のみ表示、裏面と採点ボタンを隠す
   document.querySelector('.card-front').classList.remove('hidden');
   document.querySelector('.card-back').classList.add('hidden');
   document.getElementById('grade-buttons').classList.add('hidden');
+}
+
+/** 例文の中の見出し語（活用形）だけを <mark> で囲む。innerHTML を使わず要素を組み立てる */
+function fillHighlighted(el, sentence, form) {
+  el.replaceChildren();
+  const i = form ? sentence.indexOf(form) : -1;
+  if (i < 0) {
+    el.textContent = sentence;
+    return;
+  }
+  const mark = document.createElement('mark');
+  mark.textContent = form;
+  el.append(sentence.slice(0, i), mark, sentence.slice(i + form.length));
+}
+
+/** 英和カードで例文があれば、表面に原文、裏面に原文・訳・出典を出す */
+function showLiteraryExample(word) {
+  const ex = word.dict === '英和' && !word.isUser ? literaryExamples[word.headword] : null;
+  const front = document.getElementById('lit-front');
+  const back = document.getElementById('lit-back');
+  front.classList.toggle('hidden', !ex);
+  back.classList.toggle('hidden', !ex);
+  if (!ex) return;
+  fillHighlighted(front, ex.en, ex.form);
+  fillHighlighted(document.getElementById('lit-back-en'), ex.en, ex.form);
+  document.getElementById('lit-back-ja').textContent = `訳: ${ex.ja}`;
+  document.getElementById('lit-back-source').textContent = `— ${ex.author}『${ex.work}』`;
 }
 
 /** 取りこんだ単語だけ、例文・訳文と「意味を書き足す」欄を出す */
@@ -868,7 +912,8 @@ async function init() {
 
   try {
     // CSV を読み込む
-    allWords = (await loadCSV()).concat(toUserCards());
+    const [csvWords] = await Promise.all([loadCSV(), loadExamples()]);
+    allWords = csvWords.concat(toUserCards());
 
     // ホーム画面のローディング表示を消して、コンテンツを表示
     document.getElementById('loading-message').classList.add('hidden');

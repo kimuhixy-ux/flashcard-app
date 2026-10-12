@@ -99,6 +99,7 @@
           <span class="dict-badge" id="dict-badge">英和</span>
           <!-- 表面（見出し語） -->
           <p class="word-text" id="word-front"></p>
+          <p class="lit-example hidden" id="lit-front" lang="en"></p>
           <p class="hint-text">タップして答えを見る</p>
         </div>
         <div class="card-back hidden">
@@ -114,6 +115,11 @@
               <textarea id="input-meaning" rows="2"></textarea>
               <button class="btn-small" id="btn-save-meaning" type="button">意味を保存</button>
             </div>
+          </div>
+          <div id="lit-back" class="lit-back hidden">
+            <p class="lit-example" id="lit-back-en" lang="en"></p>
+            <p class="example-ja" id="lit-back-ja"></p>
+            <p class="lit-source" id="lit-back-source"></p>
           </div>
           <p class="card-meta" id="word-meta"></p>
         </div>

@@ -592,3 +592,9 @@ html, body {
 
 .meaning-edit { margin-top: 8px; }
 .meaning-edit .btn-small { margin-top: 6px; }
+
+/* 英米文学の例文（表面は問題文、裏面は訳つき） */
+.lit-example { font-family: Georgia, serif; line-height: 1.6; margin: 12px 0 6px; text-align: left; }
+.lit-example mark { background: none; color: var(--accent); font-weight: 700; }
+.lit-back { margin-top: 12px; text-align: left; }
+.lit-source { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 6px; }
