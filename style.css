@@ -598,3 +598,22 @@ html, body {
 .lit-example mark { background: none; color: var(--accent); font-weight: 700; }
 .lit-back { margin-top: 12px; text-align: left; }
 .lit-source { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 6px; }
+
+/* デッキ切り替え（単語 / 文法 / イディオム） */
+.deck-switch { display: flex; gap: 8px; margin-bottom: 16px; }
+.deck-btn {
+  flex: 1;
+  min-height: 44px;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+}
+.deck-btn[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+/* 文法・イディオムのカード。表が文なので見出し語より小さくする */
+.word-text.is-sentence { font-size: 1.25rem; font-weight: 600; }
+.deck-extras { margin-top: 12px; text-align: left; }
+.deck-note { font-size: 0.95rem; line-height: 1.7; color: var(--text-secondary); margin: 0 0 10px; }

@@ -30,6 +30,12 @@ const CSV_PATH = 'data/words.csv';
 /** 英米文学の例文（見出し語 → {en, form, ja, work, author}） */
 const EXAMPLES_PATH = 'data/examples.json';
 
+/** 文法・イディオムのカード（茅ヶ崎方式と Forest の項目をもとに書いたもの） */
+const DECK_PATH = 'data/grammar.json';
+
+/** ホームで切り替えるデッキ。'単語' は従来の英和・和英カード */
+const DECKS = ['単語', '文法', 'イディオム'];
+
 /** セッション中の最大消化枚数（無限ループ防止） */
 const MAX_SESSION_CARDS = 80;
 
@@ -45,6 +51,7 @@ let settings = {
   sessionSize: 20,
   newPerDay: 10,
   direction: '英和',  // '英和' / '和英' / '両方'
+  deck: '単語',       // DECKS のどれか
 };
 
 /** localStorage から読んだ進捗データ { cardId: {box, due, correct, wrong, last} } */
@@ -250,14 +257,49 @@ async function loadExamples() {
   }
 }
 
+/** 文法・イディオムのカード。ID は JSON に固定で持たせ、進捗の紐づけがずれないようにする */
+async function loadDeckCards() {
+  try {
+    const res = await fetch(DECK_PATH);
+    if (!res.ok) return [];
+    const list = await res.json();
+    return list.map(c => ({
+      id: c.id,
+      headword: c.front,
+      meaning: c.back,
+      dict: c.deck,
+      deck: c.deck,
+      note: c.note || '',
+      example: c.ex || '',
+      translation: c.ja || '',
+      source: c.src || '',
+      regDate: '',
+    }));
+  } catch (e) {
+    console.warn('文法・イディオムの読み込みに失敗しました', e);
+    return [];
+  }
+}
+
 // ============================================================
 // 進捗の集計
 // ============================================================
 
 /** 現在の設定で出題対象となる単語のみ絞り込む */
 function getTargetWords() {
-  if (settings.direction === '両方') return allWords;
+  if (settings.deck !== '単語') return allWords.filter(w => w.deck === settings.deck);
+  if (settings.direction === '両方') return allWords.filter(w => !w.deck);
   return allWords.filter(w => w.dict === settings.direction);
+}
+
+/** 新規導入の日次上限はデッキごとに数える。単語は従来のキーのままにして過去の記録を活かす */
+function introKey(today) {
+  return settings.deck === '単語' ? today : `${today}:${settings.deck}`;
+}
+
+/** 数え方の単位。単語以外は文やフレーズなので「枚」にする */
+function cardUnit() {
+  return settings.deck === '単語' ? '語' : '枚';
 }
 
 /** マスター/学習中/未学習の語数を返す */
@@ -293,7 +335,7 @@ function countDueToday() {
 /** 本日まだ導入できる新規語数を返す */
 function countNewAvailableToday() {
   const today = getToday();
-  const usedToday = introCount[today] || 0;
+  const usedToday = introCount[introKey(today)] || 0;
   return Math.max(0, settings.newPerDay - usedToday);
 }
 
@@ -436,7 +478,11 @@ function updateHomeScreen() {
   const canStart = dueCount > 0 || newAvail > 0;
   const btnStart = document.getElementById('btn-start');
   const noMsg = document.getElementById('no-cards-message');
-  btnStart.textContent = `学習を始める（${settings.sessionSize}語）`;
+  btnStart.textContent = `学習を始める（${settings.sessionSize}${cardUnit()}）`;
+  document.getElementById('total-unit').textContent = cardUnit();
+  document.querySelectorAll('.deck-btn').forEach(btn => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.deck === settings.deck));
+  });
   btnStart.disabled = !canStart;
   noMsg.classList.toggle('hidden', canStart);
 }
@@ -497,6 +543,7 @@ function showNextCard() {
     `${word.dict} / 登録日: ${word.regDate}`;
   showUserCardExtras(word);
   showLiteraryExample(word);
+  showDeckExtras(word);
 
   // 表面のみ表示、裏面と採点ボタンを隠す
   document.querySelector('.card-front').classList.remove('hidden');
@@ -529,6 +576,28 @@ function showLiteraryExample(word) {
   fillHighlighted(document.getElementById('lit-back-en'), ex.en, ex.form);
   document.getElementById('lit-back-ja').textContent = `訳: ${ex.ja}`;
   document.getElementById('lit-back-source').textContent = `— ${ex.author}『${ex.work}』`;
+}
+
+/** 文法・イディオムのカードだけ、要点・例文・出典を出す。表は文になることが多いので文字を小さくする */
+function showDeckExtras(word) {
+  const isDeck = Boolean(word.deck);
+  document.getElementById('word-front').classList.toggle('is-sentence', isDeck);
+  document.getElementById('word-front-back').classList.toggle('is-sentence', isDeck);
+  const box = document.getElementById('deck-extras');
+  box.classList.toggle('hidden', !isDeck);
+  if (!isDeck) return;
+  document.getElementById('deck-note').textContent = word.note;
+  document.getElementById('deck-example').textContent = word.example;
+  document.getElementById('deck-example-ja').textContent = word.translation ? `訳: ${word.translation}` : '';
+  document.getElementById('word-meta').textContent = `${word.deck} / ${word.source}`;
+}
+
+/** ホームのデッキ切り替え。設定に保存して次回もそのデッキで開く */
+function selectDeck(deck) {
+  if (!DECKS.includes(deck)) return;
+  settings.deck = deck;
+  saveSettings();
+  updateHomeScreen();
 }
 
 /** 取りこんだ単語だけ、例文・訳文と「意味を書き足す」欄を出す */
@@ -603,7 +672,8 @@ function startSession() {
 
   // 今日の新規導入カウントを増やす
   const newCardsInSession = sessionStats.newCards;
-  introCount[today] = (introCount[today] || 0) + newCardsInSession;
+  const key = introKey(today);
+  introCount[key] = (introCount[key] || 0) + newCardsInSession;
   saveIntroCount();
 
   showScreen('study');
@@ -851,6 +921,9 @@ document.addEventListener('keydown', (e) => {
 function setupEventListeners() {
   // ホーム
   document.getElementById('btn-start').addEventListener('click', startSession);
+  document.querySelectorAll('.deck-btn').forEach(btn => {
+    btn.addEventListener('click', () => selectDeck(btn.dataset.deck));
+  });
   document.getElementById('btn-settings').addEventListener('click', openSettings);
   document.getElementById('btn-import-words').addEventListener('click', handleImportQuizWords);
   document.getElementById('btn-paste-import').addEventListener('click', () => {
@@ -912,8 +985,8 @@ async function init() {
 
   try {
     // CSV を読み込む
-    const [csvWords] = await Promise.all([loadCSV(), loadExamples()]);
-    allWords = csvWords.concat(toUserCards());
+    const [csvWords, , deckCards] = await Promise.all([loadCSV(), loadExamples(), loadDeckCards()]);
+    allWords = csvWords.concat(toUserCards(), deckCards);
 
     // ホーム画面のローディング表示を消して、コンテンツを表示
     document.getElementById('loading-message').classList.add('hidden');

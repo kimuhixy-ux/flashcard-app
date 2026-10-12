@@ -29,6 +29,13 @@
 
     <!-- 読み込み完了後に表示 -->
     <div id="home-content" class="hidden">
+      <!-- デッキの切り替え（単語 / 文法 / イディオム） -->
+      <div class="deck-switch" role="group" aria-label="デッキ">
+        <button class="deck-btn" type="button" data-deck="単語" aria-pressed="true">単語</button>
+        <button class="deck-btn" type="button" data-deck="文法" aria-pressed="false">文法</button>
+        <button class="deck-btn" type="button" data-deck="イディオム" aria-pressed="false">イディオム</button>
+      </div>
+
       <!-- 今日の状況 -->
       <section class="stat-section">
         <h2>今日の学習</h2>
@@ -59,7 +66,7 @@
           <span class="legend-learning">■ 学習中: <b id="count-learning">0</b></span>
           <span class="legend-new">■ 未学習: <b id="count-new">0</b></span>
         </div>
-        <p class="total-note">合計: <b id="count-total">0</b> 語</p>
+        <p class="total-note">合計: <b id="count-total">0</b> <span id="total-unit">語</span></p>
       </section>
 
       <!-- 学習開始ボタン -->
@@ -120,6 +127,11 @@
             <p class="lit-example" id="lit-back-en" lang="en"></p>
             <p class="example-ja" id="lit-back-ja"></p>
             <p class="lit-source" id="lit-back-source"></p>
+          </div>
+          <div id="deck-extras" class="deck-extras hidden">
+            <p class="deck-note" id="deck-note"></p>
+            <p class="example-text" id="deck-example" lang="en"></p>
+            <p class="example-ja" id="deck-example-ja"></p>
           </div>
           <p class="card-meta" id="word-meta"></p>
         </div>
