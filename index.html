@@ -134,6 +134,7 @@
             <p class="example-ja" id="deck-example-ja"></p>
           </div>
           <p class="card-meta" id="word-meta"></p>
+          <button class="btn-small" id="btn-remove-card" type="button">覚えたので削除</button>
         </div>
       </div>
     </div>
@@ -202,6 +203,15 @@
         </label>
         <button class="btn-secondary" id="btn-save-settings">設定を保存</button>
         <p id="settings-saved-msg" class="hidden save-msg">保存しました ✓</p>
+      </section>
+
+      <section class="settings-section">
+        <h2>単語の削除</h2>
+        <p class="settings-info">覚えて不要になったカードを出題から外します（いま選んでいるデッキが対象）。</p>
+        <input type="search" id="input-remove-search" class="remove-search" placeholder="見出し語で検索" autocapitalize="off" spellcheck="false">
+        <ul id="remove-results" class="remove-list"></ul>
+        <h2 class="remove-heading">削除した単語（<span id="removed-count">0</span>）</h2>
+        <ul id="removed-list" class="remove-list"></ul>
       </section>
 
       <section class="settings-section">

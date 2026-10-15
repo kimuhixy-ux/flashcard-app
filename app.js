@@ -17,6 +17,7 @@ const KEY_PROGRESS = 'wisdom_flashcards_progress_v1';
 const KEY_SETTINGS = 'wisdom_flashcards_settings_v1';
 const KEY_INTRO    = 'wisdom_flashcards_intro_v1';
 const KEY_USER_WORDS = 'wisdom_flashcards_user_words_v1';
+const KEY_REMOVED = 'wisdom_flashcards_removed_v1';
 
 /** 文型クイズから取りこんだ単語のID開始番号。CSVの行番号と重ならないよう大きく離す */
 const USER_ID_BASE = 1000000;
@@ -39,6 +40,9 @@ const DECKS = ['単語', '文法', 'イディオム'];
 /** セッション中の最大消化枚数（無限ループ防止） */
 const MAX_SESSION_CARDS = 80;
 
+/** 削除メニューの検索結果に出す最大件数。5000語以上を一度に並べると重いため */
+const MAX_REMOVE_RESULTS = 30;
+
 // ============================================================
 // グローバル変数
 // ============================================================
@@ -59,6 +63,9 @@ let progress = {};
 
 /** 文型クイズから取りこんだ単語 [{headword, meaning, example, translation, source, regDate}] */
 let userWords = [];
+
+/** 覚えて削除したカードのID。元データは消さず、出題から外すだけにして「戻す」を可能にする */
+let removedIds = new Set();
 
 /** 英米文学の例文。読めなかったときは空のまま（例文なしで学習できる） */
 let literaryExamples = {};
@@ -186,6 +193,23 @@ function saveUserWords() {
   }
 }
 
+function loadRemoved() {
+  try {
+    const raw = localStorage.getItem(KEY_REMOVED);
+    removedIds = new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    removedIds = new Set();
+  }
+}
+
+function saveRemoved() {
+  try {
+    localStorage.setItem(KEY_REMOVED, JSON.stringify([...removedIds]));
+  } catch (e) {
+    console.error('削除リストの保存に失敗しました', e);
+  }
+}
+
 /** 取りこんだ単語をカードの形にする。並び順を変えないので ID（＝進捗の紐づけ）は変わらない */
 function toUserCards() {
   return userWords.map((u, i) => ({
@@ -287,6 +311,11 @@ async function loadDeckCards() {
 
 /** 現在の設定で出題対象となる単語のみ絞り込む */
 function getTargetWords() {
+  return getDeckWords().filter(w => !removedIds.has(w.id));
+}
+
+/** 削除済みも含めた、いまのデッキ・出題方向のカード */
+function getDeckWords() {
   if (settings.deck !== '単語') return allWords.filter(w => w.deck === settings.deck);
   if (settings.direction === '両方') return allWords.filter(w => !w.deck);
   return allWords.filter(w => w.dict === settings.direction);
@@ -695,7 +724,7 @@ function finishSession() {
 
   for (const w of allWords) {
     const p = progress[w.id];
-    if (!p || p.box >= 5) continue;
+    if (!p || p.box >= 5 || removedIds.has(w.id)) continue;
     if (p.due > today) {
       schedule[p.due] = (schedule[p.due] || 0) + 1;
     }
@@ -750,6 +779,10 @@ function openSettings() {
   document.getElementById('setting-new-per-day').value = settings.newPerDay;
   document.getElementById('setting-direction').value = settings.direction;
 
+  document.getElementById('input-remove-search').value = '';
+  renderRemoveResults();
+  renderRemovedList();
+
   const info = document.getElementById('settings-word-count');
   info.textContent = `読み込み済み: ${allWords.length} 語`;
 
@@ -777,6 +810,7 @@ function exportProgress() {
     exportedAt: new Date().toISOString(),
     progress,
     introCount,
+    removedIds: [...removedIds],
   };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -804,6 +838,10 @@ function importProgress(file) {
         introCount = data.introCount;
         saveIntroCount();
       }
+      if (Array.isArray(data.removedIds)) {
+        removedIds = new Set(data.removedIds);
+        saveRemoved();
+      }
       alert('インポートが完了しました。');
     } catch {
       alert('ファイルの読み込みに失敗しました。正しい形式のJSONファイルを選択してください。');
@@ -820,6 +858,74 @@ function resetProgress() {
   saveIntroCount();
   alert('進捗をリセットしました。');
   updateHomeScreen();
+}
+
+// ============================================================
+// 覚えたカードの削除
+// ============================================================
+
+/** 学習中のカードを削除して次へ。間違えて押しても設定画面から戻せる */
+function removeCurrentCard(event) {
+  event.stopPropagation();
+  if (currentCardId === null) return;
+  if (!confirm('このカードを削除して、今後出題しないようにしますか？\n（設定画面の「単語の削除」から戻せます）')) return;
+  removedIds.add(currentCardId);
+  saveRemoved();
+  // ✗ で末尾に戻したぶんも残さない
+  sessionQueue = sessionQueue.filter(id => id !== currentCardId);
+  showNextCard();
+}
+
+/** 見出し語・意味・削除/戻すボタンを持つ1行。外部データなので textContent で入れる */
+function createRemoveRow(word, label, onTap) {
+  const li = document.createElement('li');
+  const text = document.createElement('span');
+  text.className = 'remove-word';
+  text.textContent = word.headword;
+  const meaning = document.createElement('span');
+  meaning.className = 'remove-meaning';
+  meaning.textContent = (word.meaning || '').slice(0, 40);
+  text.appendChild(meaning);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = label === '削除' ? 'btn-small btn-remove' : 'btn-small';
+  btn.textContent = label;
+  btn.addEventListener('click', onTap);
+  li.append(text, btn);
+  return li;
+}
+
+/** 検索欄に入れた文字で始まる見出し語を、削除候補として並べる */
+function renderRemoveResults() {
+  const list = document.getElementById('remove-results');
+  list.replaceChildren();
+  const query = document.getElementById('input-remove-search').value.trim().toLowerCase();
+  if (!query) return;
+  const hits = getTargetWords()
+    .filter(w => w.headword.toLowerCase().startsWith(query))
+    .slice(0, MAX_REMOVE_RESULTS);
+  for (const w of hits) {
+    list.appendChild(createRemoveRow(w, '削除', () => setRemoved(w.id, true)));
+  }
+}
+
+/** 削除済みのうち、いまのデッキのものだけ並べる（他デッキのものが混ざると探しにくいため） */
+function renderRemovedList() {
+  const list = document.getElementById('removed-list');
+  list.replaceChildren();
+  const removed = getDeckWords().filter(w => removedIds.has(w.id));
+  document.getElementById('removed-count').textContent = removed.length;
+  for (const w of removed) {
+    list.appendChild(createRemoveRow(w, '戻す', () => setRemoved(w.id, false)));
+  }
+}
+
+function setRemoved(id, isRemoved) {
+  if (isRemoved) removedIds.add(id);
+  else removedIds.delete(id);
+  saveRemoved();
+  renderRemoveResults();
+  renderRemovedList();
 }
 
 // ============================================================
@@ -938,6 +1044,7 @@ function setupEventListeners() {
   document.getElementById('btn-wrong').addEventListener('click', () => handleGrade(false));
   document.getElementById('btn-edit-meaning').addEventListener('click', openMeaningEdit);
   document.getElementById('btn-save-meaning').addEventListener('click', saveMeaning);
+  document.getElementById('btn-remove-card').addEventListener('click', removeCurrentCard);
   document.getElementById('meaning-edit').addEventListener('click', e => e.stopPropagation());
   document.getElementById('btn-quit').addEventListener('click', () => {
     if (confirm('学習を終了してホームに戻りますか？')) {
@@ -970,6 +1077,7 @@ function setupEventListeners() {
     e.target.value = '';  // 同じファイルを再選択できるようリセット
   });
   document.getElementById('btn-reset').addEventListener('click', resetProgress);
+  document.getElementById('input-remove-search').addEventListener('input', renderRemoveResults);
 }
 
 // ============================================================
@@ -982,6 +1090,7 @@ async function init() {
   loadSettings();
   loadIntroCount();
   loadUserWords();
+  loadRemoved();
 
   try {
     // CSV を読み込む

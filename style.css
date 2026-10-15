@@ -617,3 +617,30 @@ html, body {
 .word-text.is-sentence { font-size: 1.25rem; font-weight: 600; }
 .deck-extras { margin-top: 12px; text-align: left; }
 .deck-note { font-size: 0.95rem; line-height: 1.7; color: var(--text-secondary); margin: 0 0 10px; }
+
+/* 覚えたカードの削除 */
+#btn-remove-card { margin-top: 12px; color: var(--wrong); }
+.remove-search {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 16px; /* 16px 未満だと iOS Safari が入力時に勝手にズームするため */
+}
+.remove-heading { margin-top: 20px; }
+.remove-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.remove-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.remove-list .remove-word { min-width: 0; overflow-wrap: anywhere; }
+.remove-list .remove-meaning { display: block; font-size: 0.8rem; color: var(--text-secondary); }
+.remove-list .btn-small { flex-shrink: 0; }
+.remove-list .btn-remove { color: var(--wrong); }
